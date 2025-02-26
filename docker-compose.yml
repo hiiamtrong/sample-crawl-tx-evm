@@ -1,0 +1,67 @@
+services:
+  api:
+    container_name: apex-campaign-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+  
+  pgsqldb:
+    container_name: apex-campaign-pgsqldb
+    image: postgres:14.3
+    environment:
+      POSTGRES_USER: "${DB_USER}"
+      POSTGRES_PASSWORD: "${DB_PASS}"
+      POSTGRES_DB: "${DB_NAME}"
+    ports:
+      - ${DB_PORT}:5432
+    volumes:
+      - pgsqldata:/var/lib/postgresql/data
+
+  redis:
+    image: redis
+    container_name: apex-campaign-redis
+    environment:
+      REDIS_PASS: ${REDIS_PASS}
+    ports:
+      - ${REDIS_PORT}:6379
+    command: redis-server --requirepass ${REDIS_PASS}
+    
+  kafka-0:
+     image: bitnami/kafka:3.4
+     container_name: apex-campaign-kafka-0
+     ports:
+       - "39092:39092"
+     environment:
+       ALLOW_PLAINTEXT_LISTENER: yes
+       KAFKA_CFG_NODE_ID: 0
+       KAFKA_CFG_PROCESS_ROLES: controller,broker
+       KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://0.0.0.0:39092
+       KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka-0:9092,EXTERNAL://localhost:39092
+       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+       KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka-0:9093
+       KAFKA_KRAFT_CLUSTER_ID: abcdefghijklmnopqrstuv
+
+  kafka-ui:
+     container_name: apex-campaign-kafka-ui
+     image: provectuslabs/kafka-ui:latest
+     ports:
+       - 8877:8080
+     depends_on:
+       - kafka-0
+     environment:
+       KAFKA_CLUSTERS_0_NAME: "kafka-0"
+       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-0:9092
+       DYNAMIC_CONFIG_ENABLED: 'true'
+
+  maildev:
+    image: maildev/maildev
+    container_name: apex-campaign-maildev
+    restart: always
+    ports:
+      - 1080:1080
+      - 1025:1025
+
+volumes:
+  pgsqldata:
